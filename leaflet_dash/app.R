@@ -17,7 +17,6 @@ library(shiny)
 library(shinydashboard)
 library(yaml)
 library(dplyr)
-library(readr)
 library(ggplot2)
 library(plotly)
 library(DT)
@@ -26,6 +25,7 @@ library(sf)
 library(leaflet.extras)
 
 # Load Chicago neighborhood polygons
+## Source: https://data.cityofchicago.org/Facilities-Geographic-Boundaries/Boundaries-Neighborhoods/bbvz-uum9
 chi.nbrhd <- st_read("Boundaries - Neighborhoods.geojson")
 
 # Load data from vacant and abandoned building API
@@ -33,7 +33,7 @@ chi.nbrhd <- st_read("Boundaries - Neighborhoods.geojson")
 tkn <- read_yaml("auth.yaml")$app_token  # Secretly load API app token
 url <- paste0(  # Insert API token into request URL
   "https://data.cityofchicago.org/resource/kc9i-wq85.geojson?$$app_token=",
-  tkn
+  tkn, "&$limit=999999"
 )
 vct.abdn.load <- st_read(url)  # Load data from API URL
 
