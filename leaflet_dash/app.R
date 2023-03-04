@@ -6,8 +6,36 @@
 #
 #    http://shiny.rstudio.com/
 #
+#
+# CITY OF CHICAGO VACANT AND ABANDONED BUILDINGS DASHBOARD
+# Author: Jack Jacobs
+# Date: 4 March 2023
 
+
+# Importing libraries
 library(shiny)
+library(shinydashboard)
+library(yaml)
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(plotly)
+library(DT)
+library(leaflet)
+library(sf)
+library(leaflet.extras)
+
+# Load Chicago neighborhood polygons
+chi.nbrhd <- st_read("Boundaries - Neighborhoods.geojson")
+
+# Load data from vacant and abandoned building API
+## URL: https://data.cityofchicago.org/Buildings/Vacant-and-Abandoned-Buildings-Violations/kc9i-wq85
+tkn <- read_yaml("auth.yaml")$app_token  # Secretly load API app token
+url <- paste0(  # Insert API token into request URL
+  "https://data.cityofchicago.org/resource/kc9i-wq85.geojson?$$app_token=",
+  tkn
+)
+vct.abdn.load <- st_read(url)  # Load data from API URL
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
