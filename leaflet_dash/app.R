@@ -132,7 +132,7 @@ ui <- dashboardPage(
         fluidRow(
           box(
             width=12,
-            title="Complaints by Neighborhood Over Time in Selected Data",
+            title="Violations by Neighborhood Over Time in Selected Data",
             plotlyOutput("complaint.plotly")
           )
         ),
@@ -196,6 +196,7 @@ server <- function(input, output) {
   })
   
   ## Leaflet tab ##
+  # Render tiles
   output$leaflet <- renderLeaflet({
     leaflet() %>%
       addTiles(
@@ -245,6 +246,25 @@ server <- function(input, output) {
     leafletProxy("leaflet", data = nbrhd) %>%
       clearShapes() %>%
       addPolygons(fill=F, color="blue")
+  })
+  
+  ## Visualization tab ##
+  # Total complaints by neighborhood over time
+  output$complaint.plotly <- renderPlotly({
+    ggplotly(
+      ggplot(
+        vct.abdn.input() %>%
+          mutate(Month = as_date(format(issued_date, "%Y-%m-01"))) %>%
+          group_by(Month, pri_neigh) %>%
+          summarize(Count = n()) %>%
+          rename(Neighborhood = pri_neigh),
+        aes(x = Month, y = Count, fill = Neighborhood)
+      ) +
+        geom_bar(stat="summary", fun="sum") +
+        theme_classic() +
+        xlab("Month") + ylab("Total violations issued"),
+      tooltip = c("Month","Count","Neighborhood")
+    )
   })
 }
 
