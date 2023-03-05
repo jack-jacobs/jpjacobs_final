@@ -27,6 +27,7 @@ library(sp)
 library(sf)
 library(shiny)
 library(shinyWidgets)
+library(stats)
 
 #### Load Data ####
 # Load Chicago neighborhood polygons
@@ -141,7 +142,7 @@ ui <- dashboardPage(
         fluidRow(
           box(
             width=12,
-            title="Top 10 Most Fined Entities in Selected Data",
+            title="Top 6 Most Fined Entities in Selected Data",
             plotlyOutput("fines.plotly")
           )
         )
@@ -251,19 +252,41 @@ server <- function(input, output) {
   ## Visualization tab ##
   # Total complaints by neighborhood over time
   output$complaint.plotly <- renderPlotly({
-    ggplotly(
-      ggplot(
-        vct.abdn.input() %>%
-          mutate(Month = as_date(format(issued_date, "%Y-%m-01"))) %>%
-          group_by(Month, pri_neigh) %>%
-          summarize(Count = n()) %>%
-          rename(Neighborhood = pri_neigh),
-        aes(x = Month, y = Count, fill = Neighborhood)
-      ) +
-        geom_bar(stat="summary", fun="sum") +
-        theme_classic() +
-        xlab("Month") + ylab("Total violations issued"),
+    ggplotly(ggplot(
+      vct.abdn.input() %>%
+        # Count violations by month of issue date
+        mutate(Month = as_date(format(issued_date, "%Y-%m-01"))) %>%
+        group_by(Month, pri_neigh) %>%
+        summarize(Count = n()) %>%
+        # Rename "pri_neigh" to Neighborhood
+        rename(Neighborhood = pri_neigh),
+      aes(x = Month, y = Count, fill = Neighborhood)
+    ) +
+      geom_bar(stat="summary", fun="sum") +
+      theme_classic() +
+      xlab("Month") + ylab("Total violations issued"),
       tooltip = c("Month","Count","Neighborhood")
+    )
+  })
+  
+  # Bar chart of top 6 largest outstanding fines
+  output$fines.plotly <- renderPlotly({
+    ggplotly(ggplot(
+      vct.abdn.input() %>%
+        as_data_frame() %>%
+        select(entity_or_person_s_, current_amount_due) %>%
+        mutate(Entity = str_to_title(entity_or_person_s_)) %>%
+        group_by(Entity) %>%
+        summarize(
+          Outstanding_Fines = sum(as.numeric(current_amount_due))
+        ) %>%
+        arrange(desc(Outstanding_Fines)) %>% head(),
+      aes(x = reorder(Entity, -Outstanding_Fines), y = Outstanding_Fines)
+    ) +
+      geom_bar(stat="summary", fun="sum") +
+      theme_classic() +
+      xlab("Entity") + ylab("Outstanding Fines ($)"),
+      tooltip = c("Entity","Outstanding_Fines"),
     )
   })
 }
