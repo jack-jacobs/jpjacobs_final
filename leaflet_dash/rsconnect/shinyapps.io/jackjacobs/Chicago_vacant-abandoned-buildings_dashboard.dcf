@@ -1,0 +1,13 @@
+name: Chicago_vacant-abandoned-buildings_dashboard
+title: Chicago_vacant-abandoned-buildings_dashboard
+username:
+account: jackjacobs
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 8479807
+bundleId: 6917382
+url: https://jackjacobs.shinyapps.io/Chicago_vacant-abandoned-buildings_dashboard/
+when: 1678008806.13072
+lastSyncTime: 1678008806.13072
+asMultiple: FALSE
+asStatic: FALSE
