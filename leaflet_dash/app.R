@@ -164,6 +164,10 @@ ui <- dashboardPage(
           box(
             width=12,
             title="Filtered Vacant/Abandoned Violation Data",
+            p(tags$a(
+              href="https://data.cityofchicago.org/Buildings/Vacant-and-Abandoned-Buildings-Violations/kc9i-wq85", 
+              "More information about this data is available from the City of Chicago."
+            )),
             DTOutput("data")
           )
         )
@@ -300,11 +304,20 @@ server <- function(input, output) {
     }
   )
   
-  # Export data to CSV when download button is pushed
-  observeEvent(input$download, {
-    
+  # Display DT
+  output$data <- renderDT({
+    datatable(
+      data = vct.abdn.input() %>%
+        as_data_frame() %>%
+        select(
+          docket_number, issued_date, property_address, pri_neigh,
+          entity_or_person_s_, violation_type, disposition_description
+        ),
+      options = list(pageLength=10),
+      rownames=F
+    )
   })
 }
 
-# Run the application 
+## Run the application ##
 shinyApp(ui = ui, server = server)
