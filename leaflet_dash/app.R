@@ -18,10 +18,12 @@ library(shinydashboard)
 library(yaml)  # Used to securely access API token
 library(dplyr)
 library(stringr)
+library(lubridate)
 library(ggplot2)
 library(plotly)
 library(DT)
 library(leaflet)
+library(sp)
 library(sf)
 library(shiny)
 library(shinyWidgets)
@@ -51,7 +53,7 @@ vct.abdn.load <- vct.abdn.load %>%
   filter(!is.na(latitude) & !is.na(longitude))
 
 # Join neighborhood data to vct.abdn.load
-vct.abdn <- st_join(chi.nbrhd, vct.abdn.load, join = st_within)
+vct.abdn <- st_join(vct.abdn.load, chi.nbrhd, join = st_within)
 
 #### Define UI ####
 ui <- dashboardPage(
@@ -59,7 +61,7 @@ ui <- dashboardPage(
   # Set title
   dashboardHeader(
     title = "Vacant and Abandoned Building Violations in Chicago",
-    titleWidth=600
+    titleWidth=550
   ),
   
   # Define sidebar
@@ -71,14 +73,14 @@ ui <- dashboardPage(
       menuItem("Data Visualizations", tabName="viz"),
       menuItem("Data table", tabName="table"),
       
-      br(),  # Visual spacer
+      br(), br(), br(), br(),  # Visual spacer
       
       ## Set filter inputs ##
       # Select date range
       dateRangeInput(
         "date.range", "Violation Date Range",
-        start = Sys.Date() - 365, end = Sys.Date(),
-        min = "2001-01-01", max = Sys.Date()
+        start = Sys.Date() - (365 * 5), end = Sys.Date(),
+        min = as_date("2001-01-01"), max = Sys.Date()
       ),
       
       # Select neighborhoods
@@ -87,14 +89,20 @@ ui <- dashboardPage(
         choices = chi.nbrhd %>%
           distinct(pri_neigh) %>%
           arrange(pri_neigh),
-        multiple = TRUE,
-        selected = "Loop"
+        selected = c("Loop","Humboldt Park","New City","Lake View"),
+        options = list(
+          `actions-box` = TRUE,
+          size = 5,
+          `live-search` = TRUE
+        ),
+        multiple = TRUE
       ),
       
       # Include only violations with outstanding fines?
-      materialSwitch(
-        "fines", "Only include violations with outstanding fines?",
-        status = "Outstanding fines only"
+      switchInput(
+        "fines", "Display only points with fines due?",
+        onLabel = "Yes", offLabel = "No", labelWidth = "150px"
+        
       )
     )
   ),
@@ -146,6 +154,9 @@ ui <- dashboardPage(
         # Download button
         downloadButton("download", "Download"),
         
+        # Visual spacer
+        br(), br(),
+        
         # Data table
         fluidRow(
           box(
@@ -163,16 +174,77 @@ ui <- dashboardPage(
 server <- function(input, output) {
   
   # Reactive data function
-  vct.abdn <- reactive({
-    
-    # Require non-null neighborhood selection
-    req(input$nbrhds)
+  vct.abdn.input <- reactive({
     
     # Filter according to selections
-    vct.abdn.subset <- vct.abdn.load %>%
+    vct.abdn.subset <- vct.abdn %>%
       filter(
-        
+        issued_date >= as_date(input$date.range[1]) &
+        issued_date <= as_date(input$date.range[2]) &
+        pri_neigh %in% input$nbrhds
       )
+    
+    # Filter for only violations with outstanding fines if switch is on
+    if (input$fines) {
+      vct.abdn.subset <- vct.abdn.subset %>%
+        filter(
+          current_amount_due > 0
+        )
+    }
+    
+    return(vct.abdn.subset)
+  })
+  
+  ## Leaflet tab ##
+  output$leaflet <- renderLeaflet({
+    leaflet() %>%
+      addTiles(
+        urlTemplate = "http://mt0.google.com/vt/lyrs=m&hl=en&x={x}&y={y}&z={z}&s=Ga",
+        attribution = "Google", group = "Map"
+      ) %>%
+      addProviderTiles(
+        provider = providers$Esri.WorldImagery, group = "Satellite"
+      ) %>%
+      setView(-87.679365, 41.840675, 10) %>%
+      addLayersControl(baseGroups = c("Map", "Satellite"))
+  })
+  
+  # Filtered violation layer observer
+  observe({
+    
+    # Define data as reactive input
+    violations <- vct.abdn.input()
+    
+    # Use Leaflet Proxy to add violation locations to the map
+    leafletProxy("leaflet", data = violations) %>%
+      clearMarkers() %>%
+      addMarkers(
+        popup = ~paste0(
+          "Docket Number: ", docket_number, "<br>",
+          "Issue Date: ", format(issued_date, "%m/%d/%Y"), "<br>",
+          "Address: ", property_address, "<br>",
+          "Violation: ", violation_type
+        )
+      )
+  })
+  
+  # Reactive neighborhood filter
+  nbrhd.input <- reactive({
+    nbrhd <- chi.nbrhd %>%
+      filter(pri_neigh %in% input$nbrhds)
+    return(nbrhd)
+  })
+  
+  # Filtered neighborhood polygon observer
+  observe({
+    
+    # Define data as reactive input
+    nbrhd <- nbrhd.input()
+    
+    # Add polygon outlines to map
+    leafletProxy("leaflet", data = nbrhd) %>%
+      clearShapes() %>%
+      addPolygons(fill=F, color="blue")
   })
 }
 
