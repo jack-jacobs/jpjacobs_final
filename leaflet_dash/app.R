@@ -12,10 +12,10 @@
 # Date: 4 March 2023
 
 
-# Importing libraries
+#### Importing libraries ####
 library(shiny)
 library(shinydashboard)
-library(yaml)
+library(yaml)  # Used to securely access API token
 library(dplyr)
 library(stringr)
 library(ggplot2)
@@ -26,6 +26,7 @@ library(sf)
 library(shiny)
 library(shinyWidgets)
 
+#### Load Data ####
 # Load Chicago neighborhood polygons
 ## Source: https://data.cityofchicago.org/Facilities-Geographic-Boundaries/Boundaries-Neighborhoods/bbvz-uum9
 chi.nbrhd <- st_read("Boundaries - Neighborhoods.geojson")
@@ -45,7 +46,14 @@ vct.abdn.load <- vct.abdn.load %>%
     entity_or_person_s_, end = -3
   ))
 
-# Define UI for application that draws a histogram
+# Remove points that don't have an associated location
+vct.abdn.load <- vct.abdn.load %>%
+  filter(!is.na(latitude) & !is.na(longitude))
+
+# Join neighborhood data to vct.abdn.load
+vct.abdn <- st_join(chi.nbrhd, vct.abdn.load, join = st_within)
+
+#### Define UI ####
 ui <- dashboardPage(
   
   # Set title
@@ -151,10 +159,22 @@ ui <- dashboardPage(
   )
 )
 
-# Define server logic required to draw a histogram
-# server <- function(input, output) {
-#   
-# }
+#### Define server logic ####
+server <- function(input, output) {
+  
+  # Reactive data function
+  vct.abdn <- reactive({
+    
+    # Require non-null neighborhood selection
+    req(input$nbrhds)
+    
+    # Filter according to selections
+    vct.abdn.subset <- vct.abdn.load %>%
+      filter(
+        
+      )
+  })
+}
 
 # Run the application 
 shinyApp(ui = ui, server = server)
