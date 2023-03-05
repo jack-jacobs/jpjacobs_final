@@ -17,12 +17,14 @@ library(shiny)
 library(shinydashboard)
 library(yaml)
 library(dplyr)
+library(stringr)
 library(ggplot2)
 library(plotly)
 library(DT)
 library(leaflet)
 library(sf)
-library(leaflet.extras)
+library(shiny)
+library(shinyWidgets)
 
 # Load Chicago neighborhood polygons
 ## Source: https://data.cityofchicago.org/Facilities-Geographic-Boundaries/Boundaries-Neighborhoods/bbvz-uum9
@@ -37,41 +39,122 @@ url <- paste0(  # Insert API token into request URL
 )
 vct.abdn.load <- st_read(url)  # Load data from API URL
 
+# Remove trailing characters from violation entity column
+vct.abdn.load <- vct.abdn.load %>%
+  mutate(entity_or_person_s_ = str_sub(
+    entity_or_person_s_, end = -3
+  ))
+
 # Define UI for application that draws a histogram
-ui <- fluidPage(
-
-    # Application title
-    titlePanel("Old Faithful Geyser Data"),
-
-    # Sidebar with a slider input for number of bins 
-    sidebarLayout(
-        sidebarPanel(
-            sliderInput("bins",
-                        "Number of bins:",
-                        min = 1,
-                        max = 50,
-                        value = 30)
-        ),
-
-        # Show a plot of the generated distribution
-        mainPanel(
-           plotOutput("distPlot")
-        )
+ui <- dashboardPage(
+  
+  # Set title
+  dashboardHeader(
+    title = "Vacant and Abandoned Building Violations in Chicago",
+    titleWidth=600
+  ),
+  
+  # Define sidebar
+  dashboardSidebar(
+    sidebarMenu(
+      
+      # Set tab titles
+      menuItem("Violation Map", tabName="map"),
+      menuItem("Data Visualizations", tabName="viz"),
+      menuItem("Data table", tabName="table"),
+      
+      br(),  # Visual spacer
+      
+      ## Set filter inputs ##
+      # Select date range
+      dateRangeInput(
+        "date.range", "Violation Date Range",
+        start = Sys.Date() - 365, end = Sys.Date(),
+        min = "2001-01-01", max = Sys.Date()
+      ),
+      
+      # Select neighborhoods
+      pickerInput(
+        "nbrhds", "Neighborhoods",
+        choices = chi.nbrhd %>%
+          distinct(pri_neigh) %>%
+          arrange(pri_neigh),
+        multiple = TRUE,
+        selected = "Loop"
+      ),
+      
+      # Include only violations with outstanding fines?
+      materialSwitch(
+        "fines", "Only include violations with outstanding fines?",
+        status = "Outstanding fines only"
+      )
     )
+  ),
+  
+  # Define body
+  dashboardBody(
+    tabItems(
+      
+      # Leaflet map content
+      tabItem(
+        tabName="map",
+              
+        # Full-width leaflet box
+        fluidRow(
+          box(
+            width = 12,
+            leafletOutput("leaflet")
+          )
+        )
+      ),
+      
+      # Data visualization tab content
+      tabItem(
+        tabName="viz",
+          
+        # Complaints by neighborhood over time plot
+        fluidRow(
+          box(
+            width=12,
+            title="Complaints by Neighborhood Over Time in Selected Data",
+            plotlyOutput("complaint.plotly")
+          )
+        ),
+        
+        # Most fined entities bar chart
+        fluidRow(
+          box(
+            width=12,
+            title="Top 10 Most Fined Entities in Selected Data",
+            plotlyOutput("fines.plotly")
+          )
+        )
+      ),
+      
+      # Data table tab content
+      tabItem(
+        tabName="table",
+        
+        # Download button
+        downloadButton("download", "Download"),
+        
+        # Data table
+        fluidRow(
+          box(
+            width=12,
+            title="Filtered Vacant/Abandoned Violation Data",
+            DTOutput("data")
+          )
+        )
+      )
+    )
+  )
 )
 
 # Define server logic required to draw a histogram
-server <- function(input, output) {
-
-    output$distPlot <- renderPlot({
-        # generate bins based on input$bins from ui.R
-        x    <- faithful[, 2]
-        bins <- seq(min(x), max(x), length.out = input$bins + 1)
-
-        # draw the histogram with the specified number of bins
-        hist(x, breaks = bins, col = 'darkgray', border = 'white')
-    })
-}
+# server <- function(input, output) {
+#   
+# }
 
 # Run the application 
 shinyApp(ui = ui, server = server)
