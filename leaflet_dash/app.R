@@ -28,6 +28,7 @@ library(sf)
 library(shiny)
 library(shinyWidgets)
 library(stats)
+library(readr)
 
 #### Load Data ####
 # Load Chicago neighborhood polygons
@@ -288,6 +289,20 @@ server <- function(input, output) {
       xlab("Entity") + ylab("Outstanding Fines ($)"),
       tooltip = c("Entity","Outstanding_Fines"),
     )
+  })
+  
+  # Write a download handler for exporting data
+  output$download <- downloadHandler(
+    filename = "Chicago_bldg_violation_data.csv",
+    content = function(file) {
+      data <- vct.abdn.input()
+      write_csv(data, file)
+    }
+  )
+  
+  # Export data to CSV when download button is pushed
+  observeEvent(input$download, {
+    
   })
 }
 
